@@ -1,0 +1,13 @@
+container {
+    width: 300px;
+    border: thin solid black;
+    padding: 10px;
+}
+
+container.wider {
+    width: 600px;
+}
+
+.mono {
+    font-family: 'Courier New', Courier, monospace;
+  }
