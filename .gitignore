@@ -1,3 +1,5 @@
 /target
 /ui/dist
 /ui/node_modules
+*.db3
+*sqlite3
