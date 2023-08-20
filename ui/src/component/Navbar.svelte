@@ -64,7 +64,7 @@
 
 <style>
   nav {
-    background-color: #292827;
+    background-color: #14191f;
     height: 45px;
   }
 
@@ -147,7 +147,7 @@
   }
 
   .navbar-list.mobile {
-    background-color: #292827;
+    background-color: #14191f;
     position: fixed;
     display: block;
     height: calc(100% - 45px);
@@ -167,11 +167,11 @@
     left: 0;
     width: 100%;
     height: 1px;
-    background-color: #424245;
+    background-color: #14191f;
   }
 
   .navbar-list a {
-    color: #fff;
+    color: #ffb44c;
     text-decoration: none;
     display: flex;
     height: 45px;

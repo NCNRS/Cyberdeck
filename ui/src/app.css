@@ -6,7 +6,7 @@ html, body {
 
 body {
     color: #fff;
-    background-color: #1b1a19;
+    background-color: #0f1419;
     margin: 0;
     padding: 8px;
     box-sizing: border-box;
@@ -14,7 +14,7 @@ body {
 }
 
 a {
-    color: rgb(0,100,200);
+    color: #ffb44c;
     text-decoration: none;
 }
 
@@ -23,7 +23,7 @@ a:hover {
 }
 
 a:visited {
-    color: rgb(0,80,160);
+    color: #f59c20;
 }
 
 label {
@@ -37,7 +37,7 @@ input, button, select, textarea {
     padding: 0.4em;
     margin: 0 0 0.5em 0;
     box-sizing: border-box;
-    border: 1px solid #ccc;
+    border: 1px solid #ffb44c;
     border-radius: 2px;
 }
 
@@ -46,7 +46,7 @@ input:disabled {
 }
 
 button {
-    color: #f4f4f4;
+    color: #ffb44c;
     background-color: #1b1a19;
     outline: none;
 }
@@ -55,10 +55,12 @@ button:disabled {
     color: #999;
 }
 
-button:not(:disabled):active {
-    background-color: #755a57;
+button:focus {
+    color: #f59c20;
+    border-color: #f59c20;
 }
 
-button:focus {
-    border-color: #666;
+button:hover {
+    color: #f59c20;
+    border-color: #f59c20;
 }
