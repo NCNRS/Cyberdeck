@@ -6,10 +6,11 @@ use axum::{
     Router,
 };
 use axum_sessions::{async_session::SessionStore, SessionLayer};
-use std::{io, sync::Arc};
+use tokio_rusqlite::Connection;
+use std::io;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 
-use crate::{FRONTEND, auth::{TokenStore, user_secure, token_auth}};
+use crate::{FRONTEND, auth::{user_secure, token_auth}};
 
 pub mod api;
 pub mod test;
@@ -33,19 +34,20 @@ async fn handle_error(_err: io::Error) -> impl IntoResponse {
 /// Backend: server built form various routes that are either public, require auth, or secure login
 pub fn backend<Store: SessionStore>(
     session_layer: SessionLayer<Store>,
-    shared_state: Arc<TokenStore>,
+    state: Connection,
 ) -> Router {
     // could add tower::ServiceBuilder here to group layers, especially if you add more layers.
     // see https://docs.rs/axum/latest/axum/middleware/index.html#ordering
     Router::new()
         .merge(back_public_route())
         .merge(back_auth_route())
-        .merge(back_token_route(shared_state))
+        .merge(back_token_route(state.clone()))
         .layer(session_layer)
+        .with_state(state)
 }
 
 /// Public api endpoints
-pub fn back_public_route() -> Router {
+pub fn back_public_route() -> Router<Connection> {
     Router::new()
         // @TODO Remove test route
         .route("/auth/session", get(test::session_data_test)) // gets session data
@@ -55,7 +57,7 @@ pub fn back_public_route() -> Router {
 }
 
 /// Routes that require a secure session
-pub fn back_auth_route() -> Router {
+pub fn back_auth_route() -> Router<Connection> {
     Router::new()
         // @TODO Remove test
         .route("/secure", get(test::session_test))
@@ -63,7 +65,7 @@ pub fn back_auth_route() -> Router {
 }
 
 /// Routes that require a backend Token
-pub fn back_token_route<S>(state: Arc<TokenStore>) -> Router<S> {
+pub fn back_token_route<S>(state: Connection) -> Router<S> {
     Router::new()
         .route("/api", get(api::handler))
         .route_layer(middleware::from_fn_with_state(

@@ -25,7 +25,7 @@ pub mod migrations;
 
 use migrations::MIGRATIONS;
 
-use crate::auth::{SqliteSessionStore, TokenStore};
+use crate::auth::SqliteSessionStore;
 
 #[tokio::main]
 async fn main() {
@@ -61,13 +61,10 @@ async fn main() {
     let session_layer = SessionLayer::new(SqliteSessionStore::new(async_conn.clone()), &secret)
         .with_cookie_name(SESSION_COOKIE_NAME);
 
-    // create store for backend.  Stores an api_token.
-    let shared_state = Arc::new(TokenStore::new("123456789"));
-
     // combine the front and backend into server
     let app = Router::new()
         .merge(routes::frontend())
-        .merge(routes::backend(session_layer, shared_state));
+        .merge(routes::backend(session_layer, async_conn.clone()));
 
     tracing::info!("listening on http://{}", addr);
 
@@ -86,4 +83,3 @@ async fn shutdown_signal() {
         .expect("Expect shutdown signal handler");
     println!("signal shutdown");
 }
-

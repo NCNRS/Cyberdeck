@@ -10,6 +10,8 @@ lazy_static! {
             .down("DROP TABLE users;"),
             M::up("CREATE TABLE sessions(id Text, session BLOB);")
             .down("DROP TABLE sessions;"),
+            M::up("CREATE TABLE tokens(id Text PRIMARY KEY);")
+            .down("DROP TABLE tokens;"),
         ]);
 }
 

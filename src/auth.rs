@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use axum::{
     extract::State,
@@ -14,28 +12,6 @@ use serde::{Deserialize, Serialize};
 use tokio_rusqlite::Connection;
 use tracing::log::info;
 use anyhow::Result;
-
-
-/// Keep Tokens in memory
-// @TODO Keep tokens in sqlite
-#[derive(Clone, Debug, Default)]
-pub struct TokenStore {
-    api_token: String,
-}
-
-impl TokenStore {
-    /// Create a new TokenStore from a give string
-    pub fn new(api_token: &str) -> Self {
-        Self {
-            api_token: api_token.to_string(),
-        }
-    }
-
-    /// Check that the token provided is valid
-    pub fn api_token_check(&self, auth_header: &str) -> bool {
-        auth_header == format!("Bearer {}", self.api_token)
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SqliteSessionStore {
@@ -140,13 +116,11 @@ pub async fn user_secure<B: Send>(
 }
 
 /// middleware function to authenticate authorization token
-/// check store that contains token and see if it matches authorization header starting with "Bearer"
-/// used example in axum docs on middleware <https://docs.rs/axum/latest/axum/middleware/index.html>
 ///
 /// Returns Error's in JSON format.  
 #[allow(clippy::missing_errors_doc)]
 pub async fn token_auth<B: Send + Sync>(
-    State(store): State<Arc<TokenStore>>,
+    State(conn): State<Connection>,
     req: Request<B>,
     next: Next<B>,
 ) -> Result<Response, (StatusCode, Json<JsonError>)>{
@@ -155,17 +129,37 @@ pub async fn token_auth<B: Send + Sync>(
         .get(http::header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok());
 
-    let auth_header = if let Some(auth_header) = auth_header {
-        auth_header
+    let token = if let Some(auth_header) = auth_header {
+        if let Some(token) = auth_header.split_ascii_whitespace().last() {
+            token.to_owned()
+        } else {
+            tracing::debug!("Auth Token missing");
+            return Err((StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())));
+        }
     } else {
         tracing::debug!("Authorization header missing");
         return Err((StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())));
     };
 
-    tracing::debug!("Received Authorization Header: {}", auth_header);
+    tracing::debug!("Reveived Token: {}", token);
 
-    // check bearer authorization to see if it matches
-    if store.api_token_check(auth_header) {
+    let tokens = conn
+        .call(move |conn| { 
+            // Sql query
+            let mut stmt = conn.prepare("Select id FROM tokens WHERE id = :id")?;
+            // submit the query and get all the sessions
+            let tokens = stmt
+                .query_map(&[(":id", &token)], |row| {
+                    let data: String  = row.get(0)?;
+                    // use serde to convert the binary back to a valid Session
+                    Ok(data)
+                })?
+                .collect::<std::result::Result<Vec<String>, rusqlite::Error>>()?;
+            Ok::<_, rusqlite::Error>(tokens)
+        })
+        .await.map_err(|_err| (StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())))?;
+
+    if tokens.len() != 0 {
         Ok(next.run(req).await)
     } else {
         tracing::debug!("Authorization token does NOT match");
