@@ -17,12 +17,14 @@ pub mod test;
 pub mod auth;
 
 /// Frontend: The svelte build bundle, css and index.html from public folder
+/// This folder is made by runing `npm run build` in the ./ui directory
 pub fn frontend() -> Router {
     Router::new()
         .fallback_service(get_service(ServeDir::new(FRONTEND)).handle_error(handle_error))
         .layer(TraceLayer::new_for_http())
 }
 
+/// Helper function that returns an Internal Server Error if something goes wrong
 async fn handle_error(_err: io::Error) -> impl IntoResponse {
     (
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -31,7 +33,7 @@ async fn handle_error(_err: io::Error) -> impl IntoResponse {
 }
 
 
-/// Backend: server built form various routes that are either public, require auth, or secure login
+/// Backend: server built form various routes that are either public, require auth token, or secure login session
 pub fn backend<Store: SessionStore>(
     session_layer: SessionLayer<Store>,
     state: Connection,
@@ -46,7 +48,8 @@ pub fn backend<Store: SessionStore>(
         .with_state(state)
 }
 
-/// Public api endpoints
+/// Public api endpoints.
+/// This is mostly just for logging in.
 pub fn back_public_route() -> Router<Connection> {
     Router::new()
         // @TODO Remove test route
@@ -56,7 +59,8 @@ pub fn back_public_route() -> Router<Connection> {
         .route("/test", get(test::test))
 }
 
-/// Routes that require a secure session
+/// Routes that require a secure session.
+/// Most the app requires the user to be logged in.
 pub fn back_auth_route() -> Router<Connection> {
     Router::new()
         // @TODO Remove test
@@ -64,7 +68,7 @@ pub fn back_auth_route() -> Router<Connection> {
         .route_layer(middleware::from_fn(user_secure))
 }
 
-/// Routes that require a backend Token
+/// Routes that require an api token.
 pub fn back_token_route<S>(state: Connection) -> Router<S> {
     Router::new()
         .route("/api", get(api::handler))

@@ -22,9 +22,7 @@ pub mod user;
 pub mod auth;
 pub mod routes;
 pub mod migrations;
-
 use migrations::MIGRATIONS;
-
 use crate::auth::SqliteSessionStore;
 
 #[tokio::main]
@@ -48,12 +46,11 @@ async fn main() {
         Ok(secret) => secret.as_bytes().to_owned(),
         Err(_) => rand::thread_rng().gen::<[u8; 64]>().to_vec()
     };
-
     let addr: SocketAddr = format!("{}:{}", host, port)
         .parse()
         .expect("Can not parse address and port");
 
-    // Setup DB
+    // Setup DB connection pool and run migrations
     let mut async_conn = Connection::open("./my_db.db3").await.unwrap();
     MIGRATIONS.to_latest(&mut async_conn).await.expect("DB migrations failed");
 
@@ -61,7 +58,8 @@ async fn main() {
     let session_layer = SessionLayer::new(SqliteSessionStore::new(async_conn.clone()), &secret)
         .with_cookie_name(SESSION_COOKIE_NAME);
 
-    // combine the front and backend into server
+    // combine the frontend and backend routers to create the full app
+    // routes are setup in ./routes/mod.rs
     let app = Router::new()
         .merge(routes::frontend())
         .merge(routes::backend(session_layer, async_conn.clone()));
@@ -77,6 +75,7 @@ async fn main() {
 
 /// Tokio signal handler that will wait for a user to press CTRL+C.
 /// We use this in our `Server` method `with_graceful_shutdown`.
+// @TODO What other tasks should we run
 async fn shutdown_signal() {
     tokio::signal::ctrl_c()
         .await

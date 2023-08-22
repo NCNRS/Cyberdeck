@@ -13,12 +13,14 @@ use tokio_rusqlite::Connection;
 use tracing::log::info;
 use anyhow::Result;
 
+/// Store session information in Sqlite db using rusqlite
 #[derive(Debug, Clone)]
 pub struct SqliteSessionStore {
     conn: Connection,
 }
 
 impl SqliteSessionStore {
+    /// Create a new session store from a tokio_rusqilte connection
     pub fn new(conn: Connection) -> Self {
         Self { conn }
     }
@@ -111,47 +113,52 @@ pub async fn user_secure<B: Send>(
     let user_id = session.get_raw("user_id").ok_or(StatusCode::UNAUTHORIZED)?;
     tracing::debug!("user_id Extracted: {}", user_id);
 
-    // @TODO Now accepts all users, need to check for user roles
+    // @TODO Can check user for user roles here in the future
     Ok(next.run(req).await)
 }
 
-/// middleware function to authenticate authorization token
-///
-/// Returns Error's in JSON format.  
+/// Middleware function to authenticate authorization token 
 #[allow(clippy::missing_errors_doc)]
 pub async fn token_auth<B: Send + Sync>(
     State(conn): State<Connection>,
     req: Request<B>,
     next: Next<B>,
 ) -> Result<Response, (StatusCode, Json<JsonError>)>{
+    // Auth header should be in the form of `Bearer xxxxxxxx....`
     let auth_header = req
         .headers()
         .get(http::header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok());
 
+    // Get the raw token
     let token = if let Some(auth_header) = auth_header {
+        // We don't care about the `Bearer` part we just want the raw token
         if let Some(token) = auth_header.split_ascii_whitespace().last() {
+            // The last part should be the raw token after spliting by whitespace
             token.to_owned()
         } else {
-            tracing::debug!("Auth Token missing");
+            // The token wasn't formated correctly
+            tracing::debug!("Auth Token Bad Format");
             return Err((StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())));
         }
     } else {
+        // AUTHORIZATION header was not found or not parsed correctly
         tracing::debug!("Authorization header missing");
         return Err((StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())));
     };
 
     tracing::debug!("Reveived Token: {}", token);
 
+    // Check that token exists in the DB
     let tokens = conn
         .call(move |conn| { 
             // Sql query
             let mut stmt = conn.prepare("Select id FROM tokens WHERE id = :id")?;
-            // submit the query and get all the sessions
+            // submit the query and get the token
+            // There should be just one row because the token is the primary key
             let tokens = stmt
                 .query_map(&[(":id", &token)], |row| {
                     let data: String  = row.get(0)?;
-                    // use serde to convert the binary back to a valid Session
                     Ok(data)
                 })?
                 .collect::<std::result::Result<Vec<String>, rusqlite::Error>>()?;
@@ -159,16 +166,19 @@ pub async fn token_auth<B: Send + Sync>(
         })
         .await.map_err(|_err| (StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())))?;
 
+    // There should be one row because the token is the primary key
     if tokens.len() != 0 {
+        // We know that it is a valid token so we can pass on the request 
         Ok(next.run(req).await)
     } else {
+        // Token not found so reject the request
         tracing::debug!("Authorization token does NOT match");
         Err((StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())))
     }
 }
 
-#[derive(Serialize, Deserialize)]
 /// Return error as Json for API requests
+#[derive(Serialize, Deserialize)]
 pub struct JsonError {
     error: String,
 }

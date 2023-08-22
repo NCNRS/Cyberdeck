@@ -5,11 +5,13 @@ use rusqlite_migration::{AsyncMigrations, M};
 lazy_static! {
     pub static ref MIGRATIONS: AsyncMigrations =
         AsyncMigrations::new(vec![
-            // Create users table
+            // Users: Username and Password Hash
             M::up("CREATE TABLE users(name TEXT PRIMARY KEY, hash TEXT);")
             .down("DROP TABLE users;"),
+            // sessions used by the session middleware. Implementation in auth.rs
             M::up("CREATE TABLE sessions(id Text, session BLOB);")
             .down("DROP TABLE sessions;"),
+            // api tokens used by the token middleware. Implementation in auth.rs
             M::up("CREATE TABLE tokens(id Text PRIMARY KEY);")
             .down("DROP TABLE tokens;"),
         ]);
