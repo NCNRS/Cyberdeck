@@ -9,6 +9,7 @@ edition = "2021"
 axum = "0.6"
 axum-sessions = "0.5"
 anyhow = "1.0"
+argon2 = "0.5"
 rand = { version = "0.8", features = ["min_const_gen"]}
 tracing = "0.1"
 async-trait = "0.1"

@@ -7,7 +7,7 @@ use axum::Router;
 use axum_sessions::SessionLayer;
 use rand::Rng;
 use std::net::SocketAddr;
-use std::{env, sync::Arc};
+use std::env;
 use tracing::log::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tokio_rusqlite::Connection;
