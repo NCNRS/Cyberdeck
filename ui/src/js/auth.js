@@ -1,13 +1,12 @@
 import {user} from './store.js';
 
-export async function getSession() {
-    const res = await fetch('/auth/session',{credentials: 'same-origin'});
-    let sessionResponse = await res.json();
-    if (sessionResponse.user_id !== '') {
-        user.set(sessionResponse.user_id);
-    } else
-    {
-        user.set('');
+export async function checkCookie() {
+    const res = await fetch("/secure/check", {});
+    if (res.status == 200) {
+        let cookieResponse = await res.json();
+        user.set(cookieResponse.user);
+    } else {
+        user.set(null);
     }
 }
 
@@ -30,6 +29,6 @@ export async function getLogout(username, password) {
     if (logoutResponse.result == "error") {
         // may want to return an error here
     }else {
-        user.set('');
+        user.set(null);
     }
 }

@@ -4,7 +4,7 @@
 #![allow(missing_docs)]
 
 use axum::Router;
-use axum_sessions::SessionLayer;
+use axum_login::{RusqliteStore, AuthLayer, axum_sessions::SessionLayer};
 use rand::Rng;
 use rusqlite::params;
 use std::net::SocketAddr;
@@ -29,7 +29,7 @@ pub mod migrations;
 use migrations::MIGRATIONS;
 use crate::{
     auth::SqliteSessionStore,
-    user::User
+    user::{User, UserMapper}
 };
 
 #[tokio::main]
@@ -76,15 +76,15 @@ async fn main() {
     MIGRATIONS.to_latest(&mut async_conn).await.expect("DB migrations failed");
 
     // Add default admin user and token to db
-    let admin = User::new(&admin_name, &admin_pass).expect("Could not create admin user.");
+    let admin = User::new(&admin_name, &admin_pass, 1).expect("Could not create admin user.");
 
     async_conn.clone().call(move |conn| { 
         conn.execute(
-            "INSERT OR REPLACE INTO users (name, hash) VALUES (?1, ?2)",
-            params![admin.name, admin.hash],
+            "INSERT INTO users (id, name, hash) VALUES (?1, ?2, $3) ON CONFLICT(id) DO UPDATE SET name=excluded.name, hash=excluded.hash",
+            params![admin.id, admin.name, admin.hash],
         )?;
         conn.execute(
-            "INSERT OR REPLACE INTO tokens (id) VALUES (?1)",
+            "INSERT INTO tokens (id) VALUES (?1) ON CONFLICT(id) DO UPDATE SET id=excluded.id",
             params![api_token],
         )   
     }).await.expect("Could not set default admin user or token.");
@@ -92,12 +92,14 @@ async fn main() {
     // setup up sessions and store to keep track of session information
     let session_layer = SessionLayer::new(SqliteSessionStore::new(async_conn.clone()), &secret)
         .with_cookie_name(SESSION_COOKIE_NAME);
+    let user_store = RusqliteStore::<User, UserMapper>::new(async_conn.clone());
+    let auth_layer = AuthLayer::new(user_store, &secret);
 
     // combine the frontend and backend routers to create the full app
     // routes are setup in ./routes/mod.rs
     let app = Router::new()
         .merge(routes::frontend())
-        .merge(routes::backend(session_layer, async_conn.clone()));
+        .merge(routes::backend(session_layer, auth_layer, async_conn.clone()));
 
     tracing::info!("listening on http://{}", addr);
 

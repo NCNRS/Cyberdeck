@@ -1,6 +1,6 @@
 <script>
     import { user } from "./../js/store.js";
-    import { getSession, postLogin } from "./../js/auth";
+    import { postLogin } from "./../js/auth";
 
     let username, password;
     let errorMessage = "";
@@ -10,14 +10,18 @@
         if (loginResponse.result == "error") {
             errorMessage = loginResponse.message;
         } else {
-            getSession();
+            if (loginResponse.user !== null) {
+                user.set(loginResponse.user);
+            } else {
+                user.set(null);
+            }
         }
     }
 </script>
 
 {#if !$user}
     {#if errorMessage}
-        <div>
+        <div class="errmsg">
             {errorMessage}
         </div>
     {/if}
@@ -62,5 +66,9 @@
     label {
         width: 210px;
         text-align: left;
+    }
+
+    .errmsg {
+        color: #D95757;
     }
 </style>

@@ -1,5 +1,5 @@
 use axum::{response::IntoResponse, Json, extract::State};
-use axum_sessions::{async_session::serde_json::json, extractors::WritableSession};
+use serde_json::json;
 use serde::Deserialize;
 use argon2::{
     password_hash::{PasswordHash, PasswordVerifier},
@@ -7,23 +7,28 @@ use argon2::{
 };
 use tokio_rusqlite::Connection;
 
+use crate::{user::User, auth::AuthContext};
+
 /// route to handle log in
-pub async fn login(State(conn): State<Connection>, mut session: WritableSession, Json(login): Json<Login>) -> impl IntoResponse {
+pub async fn login(State(conn): State<Connection>, mut auth: AuthContext, Json(login): Json<Login>) -> impl IntoResponse {
     tracing::info!("Login Attempt: {}", login.username);
     let name = login.username.clone();
     // get password hash from db
     let query = conn
         .call(move |conn| { 
             // Sql query
-            let mut stmt = conn.prepare("Select hash FROM users WHERE name = :name")?;
+            let mut stmt = conn.prepare("Select name, hash, id FROM users WHERE name = :name")?;
             // submit the query and get all the sessions
             let tokens = stmt
                 .query_map(&[(":name", &name)], |row| {
-                    let data: String  = row.get(0)?;
-                    // return the password hash
-                    Ok(data)
+                    // return the user struct
+                    Ok(User {
+                        name: row.get(0)?,
+                        hash: row.get(1)?,
+                        id: row.get(2)?,
+                    })
                 })?
-                .collect::<std::result::Result<Vec<String>, rusqlite::Error>>()?;
+                .collect::<std::result::Result<Vec<User>, rusqlite::Error>>()?;
             Ok::<_, rusqlite::Error>(tokens)
         })
         .await.map_err(|_err|  Json(json!({"result": "error"})));
@@ -33,39 +38,48 @@ pub async fn login(State(conn): State<Connection>, mut session: WritableSession,
         Ok(rows) => {
             // Should always return just one row since username is the primary key
             if rows.len() == 1 {
+                let user = &rows[0];
                 // Check the password against the hash
                 // This is from the argon2 docs
-                let parsed_hash = PasswordHash::new(&rows[0]).unwrap();
+                let parsed_hash = PasswordHash::new(&user.hash).unwrap();
                 if Argon2::default().verify_password(&login.password.as_bytes(), &parsed_hash).is_ok() {
                     // Passwords match so login the user
                     // @TODO Remove unwrap and properly check error
-                    session.insert("id", &login.username).unwrap();
-                    Json(json!({"result": "ok"}))
+                    auth.login(&user).await.unwrap();
+                    tracing::info!("current user: {:?}", &auth.current_user);
+                    if let Some(user) = &auth.current_user {
+                        Json(json!({
+                            "result": "ok",
+                            "user": user.name,                  
+                        }))
+                    } else {
+                        tracing::error!("User session not set: {}", &login.username);
+                        Json(json!({"result": "error", "message": "Problem creating session"}))
+                    }
                 } else {
                     // Password didn't match password in database
                     tracing::error!("Password incorrect for: {}", &login.username);
-                    Json(json!({"result": "error"}))
+                    Json(json!({"result": "error", "message": "Username or Password Wrong"}))
                 }
             } else { 
                 // User not found
                 tracing::error!("User not found in DB: {}", &login.username);
-                Json(json!({"result": "error"})) 
+                Json(json!({"result": "error", "message": "Username or Password Wrong"})) 
             }
         },
         Err(err) => {
             // Error looking user up in DB
             tracing::error!("Login DB Error: {:?}", err);
-            Json(json!({"result": "error"}))
+            Json(json!({"result": "error", "message": "Username or Password Wrong"}))
         },
     }
 }
 
 /// route to handle log out
-pub async fn logout(mut session: WritableSession) -> impl IntoResponse {
-    let user = session.get_raw("id").unwrap_or_default();
-    tracing::info!("Logging out user: {}", user);
+pub async fn logout(mut auth: AuthContext) -> impl IntoResponse {
+    tracing::info!("Logging out user: {:?}", &auth.current_user);
     // drop session
-    session.destroy();
+    auth.logout().await;
     Json(json!({"result": "ok"}))
 }
 

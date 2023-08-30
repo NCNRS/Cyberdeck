@@ -5,12 +5,15 @@ use axum::{
     routing::{get, get_service, post},
     Router,
 };
-use axum_sessions::{async_session::SessionStore, SessionLayer};
+use axum_login::{
+    axum_sessions::{async_session::SessionStore, SessionLayer},
+    AuthLayer, RequireAuthorizationLayer, RusqliteStore
+};
 use tokio_rusqlite::Connection;
 use std::io;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 
-use crate::{FRONTEND, auth::{user_secure, token_auth}};
+use crate::{FRONTEND, auth::token_auth, user::{User, UserMapper}};
 
 pub mod api;
 pub mod test;
@@ -36,6 +39,7 @@ async fn handle_error(_err: io::Error) -> impl IntoResponse {
 /// Backend: server built form various routes that are either public, require auth token, or secure login session
 pub fn backend<Store: SessionStore>(
     session_layer: SessionLayer<Store>,
+    auth_layer: AuthLayer<RusqliteStore<User, UserMapper>, i64, User>,
     state: Connection,
 ) -> Router {
     // could add tower::ServiceBuilder here to group layers, especially if you add more layers.
@@ -44,6 +48,7 @@ pub fn backend<Store: SessionStore>(
         .merge(back_public_route())
         .merge(back_auth_route())
         .merge(back_token_route(state.clone()))
+        .layer(auth_layer)
         .layer(session_layer)
         .with_state(state)
 }
@@ -53,7 +58,6 @@ pub fn backend<Store: SessionStore>(
 pub fn back_public_route() -> Router<Connection> {
     Router::new()
         // @TODO Remove test route
-        .route("/auth/session", get(test::session_data_test)) // gets session data
         .route("/auth/login", post(auth::login)) // sets username in session
         .route("/auth/logout", get(auth::logout)) // deletes username in session
         .route("/test", get(test::test))
@@ -64,8 +68,9 @@ pub fn back_public_route() -> Router<Connection> {
 pub fn back_auth_route() -> Router<Connection> {
     Router::new()
         // @TODO Remove test
-        .route("/secure", get(test::session_test))
-        .route_layer(middleware::from_fn(user_secure))
+        .route("/secure", get(test::protected))
+        .route("/secure/check", get(test::check_cookie))
+        .route_layer(RequireAuthorizationLayer::<i64, User>::login())
 }
 
 /// Routes that require an api token.

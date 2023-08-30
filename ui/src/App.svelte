@@ -1,6 +1,6 @@
 <script>
 	import { user } from "./js/store.js";
-	import { getSession } from "./js/auth.js";
+	import { checkCookie } from "./js/auth.js";
 	import NavBar from "./component/Navbar.svelte";
 	import LogIn from "./pages/Login.svelte";
 	import LogOut from "./pages/Logout.svelte";
@@ -9,10 +9,10 @@
 	import { onMount } from "svelte";
 
 	let menu;
-	$: loggedin = $user !== "";
+	$: loggedin = $user !== null;
 
 	// check if logged in
-	onMount(getSession);
+	onMount(checkCookie);
 
 	const set_menu_items = (loggedin) => {
 		if (loggedin) {

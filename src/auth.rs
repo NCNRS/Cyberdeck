@@ -6,12 +6,20 @@ use axum::{
     response::Response,
     Json,
 };
-use axum_sessions::{async_session::{SessionStore, Session, self}, extractors::ReadableSession};
+use axum_login::{axum_sessions::{
+        async_session::{SessionStore, Session, self}, 
+        extractors::ReadableSession
+    }, RusqliteStore};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tokio_rusqlite::Connection;
 use tracing::log::info;
 use anyhow::Result;
+
+use crate::user::{User, UserMapper};
+
+/// AuthContect extractor used with axum routes
+pub type AuthContext = axum_login::extractors::AuthContext<i64, User, RusqliteStore<User, UserMapper >>;
 
 /// Store session information in Sqlite db using rusqlite
 #[derive(Debug, Clone)]
@@ -61,19 +69,19 @@ impl SessionStore for SqliteSessionStore{
 
     async fn store_session(&self, session: Session) -> async_session::Result<Option<String>> {
         info!("storing session by id `{}`", session.id());
-        let cookie = session.clone().into_cookie_value();
+        let copy = session.clone();
         // insert session into database
         self.conn
             .call(move |conn| { 
                 // sessions table takes id as string and session as a BLOB
                 conn.execute(
                     "INSERT INTO sessions (id, session) VALUES (?1, ?2)",
-                    params![session.id().to_string(), rmp_serde::to_vec(&session).unwrap()],
+                    params![copy.id(), rmp_serde::to_vec(&copy).unwrap()],
                 )
             })
             .await?;
 
-        Ok(cookie)
+        Ok(session.into_cookie_value())
     }
 
     async fn destroy_session(&self, session: Session) -> async_session::Result {
@@ -83,7 +91,7 @@ impl SessionStore for SqliteSessionStore{
             .call(move |conn| { 
                 conn.execute(
                     "DELETE FROM sessions WHERE id = ?1",
-                    params![session.id().to_string()],
+                    params![session.id()],
                 )
             })
             .await?;
@@ -110,8 +118,8 @@ pub async fn user_secure<B: Send>(
     next: Next<B>,
 ) -> Result<Response, StatusCode> {
     tracing::info!("Middleware: checking if user exists");
-    let user_id = session.get_raw("user_id").ok_or(StatusCode::UNAUTHORIZED)?;
-    tracing::debug!("user_id Extracted: {}", user_id);
+    let user_id = session.get_raw("id").ok_or(StatusCode::UNAUTHORIZED)?;
+    tracing::debug!("id Extracted: {}", user_id);
 
     // @TODO Can check user for user roles here in the future
     Ok(next.run(req).await)
