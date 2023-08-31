@@ -15,3 +15,10 @@ pub async fn protected(Extension(user): Extension<User>) -> impl IntoResponse {
 pub async fn check_cookie(Extension(user): Extension<User>) -> impl IntoResponse {
     Json(json!({ "user":  user.name }))
 }
+
+pub async fn api_test() -> impl IntoResponse {
+    tracing::info!("Seeking api data");
+    Json(
+        json!({"result": "ok", "message": "You've reached the backend API by using a valid token."}),
+    )
+}

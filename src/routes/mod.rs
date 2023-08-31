@@ -15,7 +15,6 @@ use tower_http::{services::ServeDir, trace::TraceLayer};
 
 use crate::{FRONTEND, auth::token_auth, user::{User, UserMapper}};
 
-pub mod api;
 pub mod test;
 pub mod auth;
 
@@ -76,7 +75,7 @@ pub fn back_auth_route() -> Router<Connection> {
 /// Routes that require an api token.
 pub fn back_token_route<S>(state: Connection) -> Router<S> {
     Router::new()
-        .route("/api", get(api::handler))
+        .route("/api", get(test::api_test))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             token_auth,
