@@ -7,6 +7,7 @@
 	import Secure from "./pages/Secure.svelte";
 	import Apicheck from "./pages/Apicheck.svelte";
 	import { onMount } from "svelte";
+    import Overview from "./pages/Overview.svelte";
 
 	let menu;
 	$: loggedin = $user !== null;
@@ -18,6 +19,7 @@
 		if (loggedin) {
 			return [
 				{ label: "About", id: 1 },
+				{ label: "Overview", id: 6 },
 				{ label: "Secure", id: 3 },
 				{ label: "API Check", id: 5 },
 				{ label: "Logout", id: 4 },
@@ -25,6 +27,7 @@
 		} else {
 			return [
 				{ label: "About", id: 1 },
+				{ label: "Overview", id: 6 },
 				{ label: "API Check", id: 5 },
 				{ label: "Login", id: 2 },
 			];
@@ -55,6 +58,8 @@
 	<LogOut />
 {:else if menu === 5}
 	<Apicheck />
+{:else if menu === 6}
+	<Overview />
 {:else}
 	<h2>404 Page Not Found</h2>
 {/if}
