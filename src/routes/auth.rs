@@ -10,7 +10,7 @@ use tokio_rusqlite::Connection;
 use crate::{user::User, auth::AuthContext};
 
 /// route to handle log in
-pub async fn login(State(conn): State<Connection>, mut auth: AuthContext, Json(login): Json<Login>) -> impl IntoResponse {
+pub async fn login(mut auth: AuthContext, State(conn): State<Connection>, Json(login): Json<Login>) -> impl IntoResponse {
     tracing::info!("Login Attempt: {}", login.username);
     let name = login.username.clone();
     // get password hash from db

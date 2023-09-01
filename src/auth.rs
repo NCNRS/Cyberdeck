@@ -6,10 +6,10 @@ use axum::{
     response::Response,
     Json,
 };
-use axum_login::{axum_sessions::{
-        async_session::{SessionStore, Session, self}, 
-        extractors::ReadableSession
-    }, RusqliteStore};
+use axum_login::{
+    axum_sessions::async_session::{SessionStore, Session, self}, 
+    RusqliteStore
+};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tokio_rusqlite::Connection;
@@ -60,6 +60,7 @@ impl SessionStore for SqliteSessionStore{
         
         if session.len() != 0 {
             // If more than 0 then return the session (Should only be 1 valid)
+            tracing::debug!("Session loaded: {:?}", session[0]);
             Ok(Some(session[0].clone()))
         } else {
             // If 0 then we have no valid sessions
@@ -75,11 +76,15 @@ impl SessionStore for SqliteSessionStore{
             .call(move |conn| { 
                 // sessions table takes id as string and session as a BLOB
                 conn.execute(
-                    "INSERT INTO sessions (id, session) VALUES (?1, ?2)",
+                    "INSERT INTO sessions(id, session) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET session=excluded.session",
                     params![copy.id(), rmp_serde::to_vec(&copy).unwrap()],
                 )
             })
-            .await?;
+            .await
+            .map_err(|err| {
+                tracing::debug!("Session insert err: {:?}", err); 
+                err
+            })?;
 
         Ok(session.into_cookie_value())
     }
@@ -109,20 +114,6 @@ impl SessionStore for SqliteSessionStore{
             .await?;
         Ok(())
     }
-}
-
-/// Middleware for checking if the session is ok
-pub async fn user_secure<B: Send>(
-    session: ReadableSession,
-    req: Request<B>,
-    next: Next<B>,
-) -> Result<Response, StatusCode> {
-    tracing::info!("Middleware: checking if user exists");
-    let user_id = session.get_raw("id").ok_or(StatusCode::UNAUTHORIZED)?;
-    tracing::debug!("id Extracted: {}", user_id);
-
-    // @TODO Can check user for user roles here in the future
-    Ok(next.run(req).await)
 }
 
 /// Middleware function to authenticate authorization token 
