@@ -27,7 +27,6 @@
 		} else {
 			return [
 				{ label: "About", id: 1 },
-				{ label: "Overview", id: 6 },
 				{ label: "API Check", id: 5 },
 				{ label: "Login", id: 2 },
 			];

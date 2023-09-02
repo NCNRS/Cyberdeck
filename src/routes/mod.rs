@@ -17,6 +17,7 @@ use crate::{FRONTEND, auth::token_auth, user::{User, UserMapper}};
 
 pub mod test;
 pub mod auth;
+pub mod service;
 
 /// Frontend: The svelte build bundle, css and index.html from public folder
 /// This folder is made by runing `npm run build` in the ./ui directory
@@ -66,7 +67,8 @@ pub fn back_public_route() -> Router<Connection> {
 /// Most the app requires the user to be logged in.
 pub fn back_auth_route() -> Router<Connection> {
     Router::new()
-        // @TODO Remove test
+        .route("/services", get(service::get_services))
+        .route("/servicegroups", get(service::get_services_by_server))
         .route("/secure", get(test::protected))
         .route("/secure/check", get(test::check_cookie))
         .route_layer(RequireAuthorizationLayer::<i64, User>::login())

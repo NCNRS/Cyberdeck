@@ -23,6 +23,7 @@ const ADMIN_PASS: &str = "averyhardpass";
 const API_TOKEN: &str = "easytoken";
 
 pub mod user;
+pub mod services;
 pub mod auth;
 pub mod routes;
 pub mod migrations;
@@ -78,15 +79,19 @@ async fn main() {
     // Add default admin user and token to db
     let admin = User::new(&admin_name, &admin_pass, 1).expect("Could not create admin user.");
 
+    // Add preset entries to the DB
     async_conn.clone().call(move |conn| { 
+        // Set admin user based on username and password provided as env vars
         conn.execute(
-            "INSERT INTO users (id, name, hash) VALUES (?1, ?2, $3) ON CONFLICT(id) DO UPDATE SET name=excluded.name, hash=excluded.hash",
+            "INSERT INTO users (id, name, hash) VALUES (?1, ?2, ?3) ON CONFLICT(id) DO UPDATE SET name=excluded.name, hash=excluded.hash",
             params![admin.id, admin.name, admin.hash],
         )?;
+        // Set API token that can be set based on env var
         conn.execute(
             "INSERT INTO tokens (id) VALUES (?1) ON CONFLICT(id) DO UPDATE SET id=excluded.id",
             params![api_token],
-        )   
+        )
+           
     }).await.expect("Could not set default admin user or token.");
 
     // setup up sessions and store to keep track of session information
