@@ -8,6 +8,9 @@
     let serviceMap = new Map();
     let errorMessage = "";
     let loading = true;
+    let svc = 0;
+    let svc_x = 10;
+    let svc_y = 25;
 
     onMount(async () => {
         serviceResponse = await getServices();
@@ -30,13 +33,10 @@
     function handleClick(e) {
         const { detail } = e;
         const id = detail.node.id.split('-');
-        console.log("hello");
-        console.log(id);
-        console.log(serviceMap);
+        // console.log(id);
+        // console.log(serviceMap);
         info = JSON.stringify(serviceMap.get(id[1]));
     }
-
-
 </script>
   
   <div id="overview">
@@ -48,7 +48,7 @@
           {#each [...groupMap] as [server, services]}
         <Group color="#0F131A" groupName="{server}" position={{x: 0, y: 100}} width={600} height={200}>
               {#each services as service}
-                  <Node  useDefaults id='{service.id}' position={{x: 10, y: 25}} on:nodeClicked="{handleClick}">
+                  <Node  useDefaults id='{service.name}' position={{x: svc_x, y: svc_y}} on:nodeClicked="{handleClick}">
                       <div class='nodeWrapper'>
                       <div id='container'>
                       <div id='heading'>{service.name}</div>

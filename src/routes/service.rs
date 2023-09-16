@@ -6,23 +6,22 @@ use tokio_rusqlite::Connection;
 
 use crate::{services::Service, user::User};
 
-/// List all services by id
+/// List all services by name
 pub async fn get_services(State(conn): State<Connection>, Extension(_user): Extension<User>) -> impl IntoResponse {
     tracing::info!("Getting services");
     // get all services from db
     let query = conn
         .call(move |conn| { 
             // Sql query
-            let mut stmt = conn.prepare("Select id, name, server, status FROM services")?;
+            let mut stmt = conn.prepare("Select name, server, status FROM services")?;
             // submit the query and get all the services
             let services = stmt
                 .query_map([], |row| {
                     // return the Service struct
                     Ok(Service {
-                        id: row.get(0)?,
-                        name: row.get(1)?,
-                        server: row.get(2)?,
-                        status: row.get(3)?,
+                        name: row.get(0)?,
+                        server: row.get(1)?,
+                        status: row.get(2)?,
                     })
                 })?
                 .collect::<std::result::Result<Vec<Service>, rusqlite::Error>>()?;
@@ -36,7 +35,7 @@ pub async fn get_services(State(conn): State<Connection>, Extension(_user): Exte
             // Build a json response from our services and group them by server
             let mut map = HashMap::new();
             for service in rows {
-                map.insert(service.id.clone(), service);
+                map.insert(service.name.clone(), service);
             }
             Json(json!({
                 "result": "ok",
@@ -58,16 +57,15 @@ pub async fn get_services_by_server(State(conn): State<Connection>, Extension(_u
     let query = conn
         .call(move |conn| { 
             // Sql query
-            let mut stmt = conn.prepare("Select id, name, server, status FROM services")?;
+            let mut stmt = conn.prepare("Select name, server, status FROM services")?;
             // submit the query and get all the services
             let services = stmt
                 .query_map([], |row| {
                     // return the Service struct
                     Ok(Service {
-                        id: row.get(0)?,
-                        name: row.get(1)?,
-                        server: row.get(2)?,
-                        status: row.get(3)?,
+                        name: row.get(0)?,
+                        server: row.get(1)?,
+                        status: row.get(2)?,
                     })
                 })?
                 .collect::<std::result::Result<Vec<Service>, rusqlite::Error>>()?;

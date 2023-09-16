@@ -15,10 +15,8 @@ lazy_static! {
             M::up("CREATE TABLE tokens(id TEXT PRIMARY KEY);")
             .down("DROP TABLE tokens;"),
             // services
-            M::up("CREATE TABLE services(id INTEGER PRIMARY KEY AUTOINCREMENT, server TEXT, name TEXT, status INTEGER);")
+            M::up("CREATE TABLE services(name TEXT PRIMARY KEY, server TEXT, status INTEGER);")
             .down("DROP TABLE services;"),
-            M::up("INSERT INTO services(server, name, status) VALUES ('Main', 'Cyberdeck', 0);")
-            .down("DELETE FROM services;"),
         ]);
 }
 

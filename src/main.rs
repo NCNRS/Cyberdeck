@@ -12,6 +12,7 @@ use std::env;
 use tracing::log::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tokio_rusqlite::Connection;
+use futures::StreamExt;
 
 // SETUP Constants
 const SESSION_COOKIE_NAME: &str = "cyberdeck_session";
@@ -23,6 +24,7 @@ const ADMIN_PASS: &str = "averyhardpass";
 const API_TOKEN: &str = "easytoken";
 
 pub mod user;
+pub mod fixer;
 pub mod services;
 pub mod auth;
 pub mod routes;
@@ -30,7 +32,8 @@ pub mod migrations;
 use migrations::MIGRATIONS;
 use crate::{
     auth::SqliteSessionStore,
-    user::{User, UserMapper}
+    user::{User, UserMapper}, 
+    fixer::process_msg,
 };
 
 #[tokio::main]
@@ -72,6 +75,18 @@ async fn main() {
         .parse()
         .expect("Can not parse address and port");
 
+    // Setup connection to fixer
+    let fixer = async_nats::connect("localhost:4222").await.expect("Could not connect to fixer");
+    // Spawn new task to handle msgs from fixer
+    tokio::spawn(async move {
+        let mut subscriber = fixer.clone().subscribe("cyberdeck".into()).await.expect("Could not subscribe to fixer");
+        // Receive and process messages
+        while let Some(msg) = subscriber.next().await {
+            tracing::info!("Received fixer msg: {:?}", msg);
+            process_msg(msg).await;
+        }
+    });
+
     // Setup DB connection pool and run migrations
     let mut async_conn = Connection::open("./my_db.db3").await.unwrap();
     MIGRATIONS.to_latest(&mut async_conn).await.expect("DB migrations failed");
@@ -85,6 +100,16 @@ async fn main() {
         conn.execute(
             "INSERT INTO users (id, name, hash) VALUES (?1, ?2, ?3) ON CONFLICT(id) DO UPDATE SET name=excluded.name, hash=excluded.hash",
             params![admin.id, admin.name, admin.hash],
+        )?;
+        // Set cyberdeck service in db
+        conn.execute(
+            "INSERT INTO services (name, server, status) VALUES (?1, ?2, ?3) ON CONFLICT(name) DO UPDATE SET server=excluded.server, status=excluded.status",
+            params!["Cyberdeck", "Main", 1],
+        )?;
+        // Set fixer in db
+        conn.execute(
+            "INSERT INTO services (name, server, status) VALUES (?1, ?2, ?3) ON CONFLICT(name) DO UPDATE SET server=excluded.server, status=excluded.status",
+            params!["Fixer", "Main", 1],
         )?;
         // Set API token that can be set based on env var
         conn.execute(
